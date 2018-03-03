@@ -761,6 +761,7 @@ mod tests {
                 button: MouseButton::Left,
                 device_id: unsafe { ::std::mem::transmute_copy(&0) },
                 modifiers: ModifiersState::default(),
+
             },
             window_id: unsafe { ::std::mem::transmute_copy(&0) },
         },
