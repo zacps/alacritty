@@ -1263,7 +1263,7 @@ impl Config {
     pub fn write_defaults() -> io::Result<Cow<'static, Path>> {
         let path = ::xdg::BaseDirectories::with_prefix("alacritty")
             .map_err(|err| io::Error::new(io::ErrorKind::NotFound, ::std::error::Error::description(&err)))
-            .and_then(|mut p| p.place_config_file("alacritty.yml"))?;
+            .and_then(|p| p.place_config_file("alacritty.yml"))?;
         File::create(&path)?.write_all(DEFAULT_ALACRITTY_CONFIG.as_bytes())?;
         Ok(path.into())
     }
