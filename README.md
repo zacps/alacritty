@@ -24,7 +24,7 @@ The software is considered to be at an **alpha** level of readiness--there are
 missing features and bugs to be fixed, but it is already used by many as a daily
 driver.
 
-Precompiled binaries are available for Windows through [appveyor](https://ci.appveyor.com/project/jwilm/alacritty).
+Precompiled binaries are available for Windows through [appveyor](https://ci.appveyor.com/project/zacps/alacritty).
 Precompiled binaries for other platforms are minimally blocked on a stable config format. For now, Alacritty must be
 built from source.
 
