@@ -31,10 +31,18 @@ install:
   - rustc -Vv
   - cargo -V
 
-build_script:
-  # Only build once per architecture
+before_build:
   - if [%CLIPPY%]==[false] (
-      cargo +%RUST_TOOLCHAIN% build --release
+      cargo install cargo-wix &
+      choco install wixtoolset &
+      set WIX_PATH="C:\Program Files (x86)\WiX Toolset v3.11\bin"
+    )
+
+build_script:
+  # Only build and publish once per architecture
+  - if [%CLIPPY%]==[false] (
+      cargo +%RUST_TOOLCHAIN% build --release &
+      cargo wix --nocapture --no-build -l LICENSE-APACHE assets\windows\msi.wxs
     )
 
 before_test:
@@ -59,3 +67,5 @@ artifacts:
     name: Alacritty
   - path: target\release\winpty-agent.exe
     name: Winpty agent
+  - path: target\release\*.msi
+    name: Alacritty installer
