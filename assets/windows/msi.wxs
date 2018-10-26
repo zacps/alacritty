@@ -1,0 +1,136 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<!-- 
+  Copyright (C) 2017 Christopher R. Field.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  
+  http://www.apache.org/licenses/LICENSE-2.0
+  
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<?if $(var.Platform) = x64 ?>
+    <?define Win64 = "yes" ?>
+    <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+<?else ?>
+  <?define Win64 = "no" ?>
+  <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+<?endif ?>
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+    <Product 
+        Id='*' 
+        Name='$(var.ProductName)' 
+        UpgradeCode='B37E297C-548F-4BD8-BF4B-29DBDF6C8336' 
+        Manufacturer='$(var.Manufacturer)'
+        Language='1033' 
+        Codepage='1252' 
+        Version='$(var.Version)'>
+
+        <Package Id='*' 
+            Keywords='Installer' 
+            Description='$(var.Description)'
+            Manufacturer='$(var.Manufacturer)'
+            InstallerVersion='450' 
+            Languages='1033' 
+            Compressed='yes' 
+            InstallScope='perMachine'
+            SummaryCodepage='1252'
+            Platform='$(var.Platform)'/>
+
+        <MajorUpgrade 
+            Schedule='afterInstallInitialize' 
+            DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
+
+        <Media Id='1' Cabinet='media1.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1'/>
+        <Property Id='DiskPrompt' Value='$(var.ProductName) Installation'/>
+
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
+                <Directory Id='APPLICATIONFOLDER' Name='$(var.ProductName)'>
+                    <Component Id='License' Guid='*' Win64='$(var.Win64)'>
+                        <File 
+                            Id='LicenseFile' 
+                            Name='$(var.LicenseName)'
+                            DiskId='1' 
+                            Source='$(var.LicenseSource)' 
+                            KeyPath='yes'/>
+                    </Component>
+                    <Directory Id='Bin' Name='bin'>
+                        <Component Id='Path' Guid='4CE01792-4DFF-431E-9DD3-EF84789B36DB' Win64='$(var.Win64)' KeyPath='yes'>
+                            <Environment 
+                                Id='PATH' 
+                                Name='PATH' 
+                                Value='[Bin]' 
+                                Permanent='no' 
+                                Part='last' 
+                                Action='set' 
+                                System='yes'/>
+                        </Component>
+                        <Component Id='$(var.BinaryName)Binary' Guid='*' Win64='$(var.Win64)'>
+                            <File 
+                                Id='$(var.BinaryName)EXE' 
+                                Name='$(var.BinaryName).exe' 
+                                Source='target\release\$(var.BinaryName).exe' 
+                                KeyPath='yes'/>
+                        </Component>
+                        <Component Id='$(var.BinaryName)WinptyAgent' Guid='*' Win64='$(var.Win64)'>
+                            <File 
+                                Id='$(var.BinaryName)WinptyAgentEXE' 
+                                Name='winpty-agent.exe' 
+                                Source='target\release\winpty-agent.exe' 
+                                KeyPath='yes'/>
+                        </Component>
+                    </Directory>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <Feature 
+            Id='MainProgram' 
+            Title='Application' 
+            Description='Installs the executable and license.' 
+            Level='1' 
+            ConfigurableDirectory='APPLICATIONFOLDER' 
+            AllowAdvertise='no' 
+            Display='expand' 
+            Absent='disallow'>
+            <ComponentRef Id='License'/>
+            <ComponentRef Id='$(var.BinaryName)Binary'/>
+            <ComponentRef Id='$(var.BinaryName)WinptyAgent'/>
+            <Feature 
+                Id='Environment' 
+                Title='PATH Environment Variable' 
+                Description='Add the install location of the [ProductName] executable to the PATH system environment variable. This allows the [ProductName] executable to be called from any location.' 
+                Level='1' 
+                Absent='allow'>
+                <ComponentRef Id='Path'/>
+            </Feature>
+        </Feature>
+
+        <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
+
+        <!--
+          Uncomment the next three lines to add a custom icon for the Add/Remove Programs.
+        -->
+        <!--<Icon Id='ProductICO' SourceFile='wix\Product.ico'/>-->
+        <!--<Property Id='ARPPRODUCTICON' Value='ProductICO' />-->
+        <!--<Property Id='ARPHELPLINK' Value='$(var.Help)'/>-->
+
+        <UIRef Id='WixUI_FeatureTree'/>
+        <WixVariable Id='WixUILicenseRtf' Value='LICENSE-APACHE'/>
+        <!-- 
+          Uncomment the next three lines to customize the installer's Graphical
+          User Interface (GUI). See the WiX Toolset documentation for details
+          about customization. The banner BMP dimensions are 493 x 58 pixels.
+          The dialog BMP dimensions are 493 x 312 pixels.
+        -->
+        <!--<WixVariable Id='WixUIBannerBmp' Value='wix\Banner.bmp'/>-->
+        <!--<WixVariable Id='WixUIDialogBmp' Value='wix\Dialog.bmp'/>-->
+    </Product>
+
+</Wix>
