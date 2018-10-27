@@ -106,7 +106,7 @@ pub fn new<'a>(
         None, // appname
         Some(&cmdline.join(" ")),
         cwd,
-        None, // Env
+        Some(config.env()),
     ).unwrap();
 
     let default_opts = &mut OpenOptions::new();

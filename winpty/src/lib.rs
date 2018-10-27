@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::result::Result;
 use std::os::windows::io::RawHandle;
 use std::ptr::{null, null_mut};
+use std::collections::HashMap;
 use fmt::{Display, Formatter};
 
 use winpty_sys::*;
@@ -303,18 +304,29 @@ impl<'a, 'b> SpawnConfig<'a> {
         appname: Option<&str>,
         cmdline: Option<&str>,
         cwd: Option<&str>,
-        end: Option<&str>,
+        env: Option<&HashMap<String, String>>,
     ) -> Result<Self, Err<'b>> {
         let mut err = null_mut() as *mut winpty_error_t;
-        let (appname, cmdline, cwd, end) = (
+
+        let (appname, cmdline, cwd, env) = (
             appname.map_or(null(), |s| WideCString::from_str(s).unwrap().into_raw()),
             cmdline.map_or(null(), |s| WideCString::from_str(s).unwrap().into_raw()),
             cwd.map_or(null(), |s| WideCString::from_str(s).unwrap().into_raw()),
-            end.map_or(null(), |s| WideCString::from_str(s).unwrap().into_raw()),
+            // Env is a null separated k=v map terminated by another null
+            env.map_or(vec![0, 0], |map| {
+                let mut vec = Vec::new();
+
+                for (k, v) in map {
+                    vec.append(&mut format!("{}={}", k, v).encode_utf16().collect::<Vec<u16>>());
+                    vec.push(0);
+                }
+                vec.push(0);
+                vec
+            }),
         );
 
         let spawn_config = unsafe {
-            winpty_spawn_config_new(spawnflags.bits(), appname, cmdline, cwd, end, &mut err)
+            winpty_spawn_config_new(spawnflags.bits(), appname, cmdline, cwd, env.as_ptr(), &mut err)
         };
 
         // Required to free the strings
@@ -327,9 +339,6 @@ impl<'a, 'b> SpawnConfig<'a> {
             }
             if !cwd.is_null() {
                 WideCString::from_raw(cwd as *mut u16);
-            }
-            if !end.is_null() {
-                WideCString::from_raw(end as *mut u16);
             }
         }
 
