@@ -85,6 +85,9 @@ Once the cask is installed, it is recommended to setup the [manual page](INSTALL
 
 Prebuilt binaries for Linux, macOS, and Windows can be downloaded from the [GitHub releases page](https://github.com/jwilm/alacritty/releases).
 
+On Windows Alacritty requires (`winpty-agent.exe`) which MUST be in the same directory as `alacritty.exe`.
+It's included in binary releases, and fetched by `build.rs` when compiled from source.
+
 ## Configuration
 
 Although it's possible the default configuration would work on your system,
