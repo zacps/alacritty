@@ -41,5 +41,5 @@ deploy:
   on:
     tags: true
     rust: stable
-    repo: jwilm/alacritty
-    branch: master
+    repo: zacps/alacritty
+    branch: windows-zip-test
