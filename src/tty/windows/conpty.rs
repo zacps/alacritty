@@ -19,6 +19,7 @@ use std::mem;
 use std::os::windows::io::IntoRawHandle;
 use std::ptr;
 use std::sync::Arc;
+use std::path::Path;
 
 use dunce::canonicalize;
 use mio_anonymous_pipes::{EventedAnonRead, EventedAnonWrite};
@@ -36,11 +37,6 @@ use winapi::um::processthreadsapi::{
 };
 use winapi::um::winbase::{EXTENDED_STARTUPINFO_PRESENT, STARTF_USESTDHANDLES, STARTUPINFOEXW};
 use winapi::um::wincon::COORD;
-
-use crate::cli::Options;
-use crate::config::{Config, Shell};
-use crate::display::OnResize;
-use crate::term::SizeInfo;
 
 // This will be merged into winapi as PR #699
 // TODO: Use the winapi definition directly after that.
@@ -93,6 +89,14 @@ pub struct Conpty {
 /// Handle can be cloned freely and moved between threads.
 pub type ConptyHandle = Arc<Conpty>;
 
+impl Conpty {
+    pub fn on_resize(&self, (cols, lines): (i16, i16)) {
+        let coord = COORD{X: cols, Y: lines};
+        let result = unsafe { (self.api.ResizePseudoConsole)(self.handle, coord) };
+        assert!(result == S_OK);
+    }
+}
+
 impl Drop for Conpty {
     fn drop(&mut self) {
         unsafe { (self.api.ClosePseudoConsole)(self.handle) }
@@ -104,12 +108,18 @@ unsafe impl Send for Conpty {}
 unsafe impl Sync for Conpty {}
 
 pub fn new<'a>(
-    config: &Config,
-    options: &Options,
-    size: &SizeInfo,
-    _window_id: Option<usize>,
+    enable_conpty: bool,
+    cols: i16,
+    lines: i16,
+    title: &str,
+    working_dir: &Path,
+    command: String,
+    args: Vec<String>
 ) -> Option<Pty<'a>> {
-    if !config.enable_experimental_conpty_backend() {
+    if !enable_conpty {
+        return None;
+    }
+    if cols <= 0 || lines <= 0 {
         return None;
     }
 
@@ -124,8 +134,7 @@ pub fn new<'a>(
     let (conout, conout_pty_handle) = miow::pipe::anonymous(0).unwrap();
     let (conin_pty_handle, conin) = miow::pipe::anonymous(0).unwrap();
 
-    let coord =
-        coord_from_sizeinfo(size).expect("Overflow when creating initial size on pseudoconsole");
+    let coord = COORD { X: cols, Y: lines };
 
     // Create the Pseudo Console, using the pipes
     let result = unsafe {
@@ -148,7 +157,6 @@ pub fn new<'a>(
 
     let mut startup_info_ex: STARTUPINFOEXW = Default::default();
 
-    let title = options.title.as_ref().map(|w| w.as_str()).unwrap_or("Alacritty");
     let title = U16CString::from_str(title).unwrap();
     startup_info_ex.StartupInfo.lpTitle = title.as_ptr() as LPWSTR;
 
@@ -207,22 +215,13 @@ pub fn new<'a>(
     }
 
     // Get process commandline
-    let default_shell = &Shell::new("powershell");
-    let shell = config.shell().unwrap_or(default_shell);
-    let initial_command = options.command().unwrap_or(shell);
-    let mut cmdline = initial_command.args().to_vec();
-    cmdline.insert(0, initial_command.program().into());
+    let mut cmdline = args;
+    cmdline.insert(0, command);
 
-    // Warning, here be borrow hell
-    let cwd = options
-        .working_dir
-        .as_ref()
-        .map(|dir| canonicalize(dir).unwrap());
-    let cwd = cwd.as_ref().map(|dir| dir.to_str().unwrap());
+    let cwd = U16CString::from_str(&canonicalize(working_dir).unwrap().to_str().unwrap()).unwrap();
 
     // Create the client application, using startup info containing ConPTY info
     let cmdline = U16CString::from_str(&cmdline.join(" ")).unwrap();
-    let cwd = cwd.map(|s| U16CString::from_str(&s).unwrap());
 
     let mut proc_info: PROCESS_INFORMATION = Default::default();
     unsafe {
@@ -234,7 +233,7 @@ pub fn new<'a>(
             false as i32,
             EXTENDED_STARTUPINFO_PRESENT,
             ptr::null_mut(),
-            cwd.map_or_else(ptr::null, |s| s.as_ptr()),
+            cwd.as_ptr(),
             &mut startup_info_ex.StartupInfo as *mut STARTUPINFOW,
             &mut proc_info as *mut PROCESS_INFORMATION,
         ) > 0;
@@ -262,28 +261,4 @@ pub fn new<'a>(
         read_token: 0.into(),
         write_token: 0.into(),
     })
-}
-
-impl OnResize for ConptyHandle {
-    fn on_resize(&mut self, sizeinfo: &SizeInfo) {
-        if let Some(coord) = coord_from_sizeinfo(sizeinfo) {
-            let result = unsafe { (self.api.ResizePseudoConsole)(self.handle, coord) };
-            assert!(result == S_OK);
-        }
-    }
-}
-
-/// Helper to build a COORD from a SizeInfo, returing None in overflow cases.
-fn coord_from_sizeinfo(sizeinfo: &SizeInfo) -> Option<COORD> {
-    let cols = sizeinfo.cols().0;
-    let lines = sizeinfo.lines().0;
-
-    if cols <= i16::MAX as usize && lines <= i16::MAX as usize {
-        Some(COORD {
-            X: sizeinfo.cols().0 as i16,
-            Y: sizeinfo.lines().0 as i16,
-        })
-    } else {
-        None
-    }
 }

@@ -859,6 +859,21 @@ impl SizeInfo {
             col: min(col, Column(self.cols().saturating_sub(1)))
         }
     }
+
+    /// Try to convert to the format expected by the conpty api
+    pub fn as_conpty_size(&self) -> Option<(i16, i16)> {
+        let cols = self.cols().0;
+        let lines = self.lines().0;
+
+        if cols <= std::i16::MAX as usize && lines <= std::i16::MAX as usize {
+            Some((
+                self.cols().0 as i16,
+                self.lines().0 as i16,
+            ))
+        } else {
+            None
+        }
+    }
 }
 
 

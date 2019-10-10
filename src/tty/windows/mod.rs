@@ -15,6 +15,7 @@
 use std::io::{self, Read, Write};
 use std::os::raw::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::env;
 
 use mio::{self, Evented, Poll, PollOpt, Ready, Token};
 use mio_anonymous_pipes::{EventedAnonRead, EventedAnonWrite};
@@ -25,7 +26,7 @@ use winapi::um::synchapi::WaitForSingleObject;
 use winapi::um::winbase::WAIT_OBJECT_0;
 
 use crate::cli::Options;
-use crate::config::Config;
+use crate::config::{Config, Shell};
 use crate::display::OnResize;
 use crate::term::SizeInfo;
 use crate::tty::EventedReadWrite;
@@ -90,7 +91,17 @@ pub fn new<'a>(
     size: &SizeInfo,
     window_id: Option<usize>,
 ) -> Pty<'a> {
-    if let Some(pty) = conpty::new(config, options, size, window_id) {
+    let enable_conpty = config.enable_experimental_conpty_backend();
+    let (cols, lines) = size.as_conpty_size().unwrap();
+    let title = options.title.as_ref().map(|w| w.as_str()).unwrap_or("Alacritty");
+    let current_dir = env::current_dir().unwrap();
+    let working_dir = options.working_dir.as_ref().unwrap_or(&current_dir);
+    let default_shell = Shell::new("powershell");
+    let shell = config.shell().unwrap_or(&default_shell);
+    let command = shell.program();
+    let args = options.command().unwrap_or(shell).args().to_vec();
+
+    if let Some(pty) = conpty::new(enable_conpty, cols, lines, title, working_dir, command.to_string(), args) {
         info!("Using Conpty agent");
         IS_CONPTY.store(true, Ordering::Relaxed);
         pty
@@ -218,7 +229,7 @@ impl<'a> OnResize for PtyHandle<'a> {
             PtyHandle::Winpty(w) => w.resize(sizeinfo),
             PtyHandle::Conpty(c) => {
                 let mut handle = c.clone();
-                handle.on_resize(sizeinfo)
+                handle.on_resize(sizeinfo.as_conpty_size().unwrap())
             }
         }
     }
