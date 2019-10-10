@@ -47,6 +47,7 @@ use alacritty::locale;
 use alacritty::{cli, event, die};
 use alacritty::config::{self, Config};
 use alacritty::display::Display;
+use alacritty::env;
 use alacritty::event_loop::{self, EventLoop, Msg};
 use alacritty::logging;
 use alacritty::panic;
@@ -126,7 +127,7 @@ fn run(
     };
 
     // Set environment variables
-    tty::setup_env(&config);
+    env::setup(&config);
 
     // Create a display.
     //
